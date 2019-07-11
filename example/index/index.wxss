@@ -1,0 +1,4 @@
+.intro, .launch {
+  margin: 0 30px;
+  text-align: center;
+}

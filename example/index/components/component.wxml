@@ -1,0 +1,1 @@
+<view class='intro' bindtap='changeName' data-name='繁星'>用户:{{name}};年龄:{{age}};身高:{{height}};公元{{year}}</view>

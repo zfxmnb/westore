@@ -1,0 +1,7 @@
+
+<view class='intro' bindtap='changeName' data-name='fanx'>name:{{Name}};age:{{Age}};height:{{height}};year{{year}}</view>
+<component/>
+<view class='launch' bindtap="updateInfo">过年</view>
+<view class='launch' bindtap="to">点击打开新的页面</view>
+<view class='launch' bindtap="addFriend">交朋友</view>
+<view wx:for='{{friends}}' wx:key='{{index}}' class='intro'  data-name='fanx'>name:{{item.name}};age:{{item.age}}<text bindtap='resetFriendName' data-index='{{index}}'> 改名</text></view>
