@@ -4,7 +4,7 @@
 export class WxStore {
   constructor(p = {}) {
     this.__instance = []; // 挂载store实例的页面、组件
-    this.__data = this._clone(p.data) || {}; // 状态
+    this.__data = clone(p.data) || {}; // 状态
     this.__mutations = p.mutations || {}; // 改变状态方法
     this.__actions = p.actions || {}; // 行为
     this.__dataMap = {}; // 数据与实例数据名称映射关系
@@ -12,47 +12,6 @@ export class WxStore {
       timer: null,
       data: null
     }
-  }
-  /**
-   * 克隆对象
-   * @param {*} Obj 克隆对象
-   */
-  _clone(Obj) {
-    let buf;
-    if (Obj instanceof Array) {
-      buf = []; // 创建一个空的数组
-      let i = Obj.length;
-      while (i--) {
-        buf[i] = this._clone(Obj[i]);
-      }
-      return buf;
-    } else if (Obj instanceof Object) {
-      buf = {}; // 创建一个空对象
-      for (let k in Obj) { // 为这个对象添加新的属性
-        buf[k] = this._clone(Obj[k]);
-      }
-      return buf;
-    } else {
-      return Obj;
-    }
-  }
-  /**
-   * 格式化对象路径
-   * @param {*} keys 路径数组
-   */
-  _fromatObjPath(keys) {
-    let key = `${keys[0]}`;
-    let arr = keys.slice(1);
-    if (arr.length) {
-      arr.forEach((k) => {
-        if (isNaN(k)) {
-          key += `.${k}`
-        } else {
-          key += `[${k}]`
-        }
-      })
-    }
-    return key
   }
   /**
    * 根据路径写入数据
@@ -70,24 +29,6 @@ export class WxStore {
       oData = oData[keys[i]]
     }
     oData[keys[i]] = val
-  }
-  /**
-   * diff 算法
-   * @param {*} oobj 原数据
-   * @param {*} obj 修改数据
-   * @param {*} okeys 修改对象的查找key数组
-   * @param {*} diffObj 生成的计算后的setData数据
-   */
-  _diff(oobj = {}, obj = {}, okeys = [], diffObj = {}) {
-    for (let k in obj) {
-      const keys = okeys.concat([k]);
-      if (obj[k] instanceof Object && oobj[k] instanceof Object) {
-        this._diff(oobj[k], obj[k], keys, diffObj)
-      } else if (obj[k] !== oobj[k]) {
-        diffObj[this._fromatObjPath(keys)] = obj[k]
-      }
-    }
-    return diffObj
   }
   /**
    * 对选择data、actions、mutations对象映射处理
@@ -198,7 +139,7 @@ export class WxStore {
     this.__dataMirror.timer = setTimeout(() => {
       this.__dataMirror.data = this.__dataMirror.timer = null;
     })
-    return this.__dataMirror.data || this._clone(this.__data)
+    return this.__dataMirror.data || clone(this.__data)
   }
   /**
    * 绑定其他store
@@ -225,7 +166,7 @@ export class WxStore {
    * @param {*} data 设置数据
    */
   setData(data) {
-    if (data instanceof Object) {
+    if (Object.prototype.toString.call(data) === '[object Object]') {
       this.__instance.forEach((I, index) => {
         let need = false;
         let newData = {};
@@ -242,13 +183,13 @@ export class WxStore {
             if (this.__data[keys[0]] !== undefined && keys.length > 1) {
               if (dataMap[keys[0]] !== undefined) {
                 need = true;
-                I.__diffData[this._fromatObjPath([...keys])] = data[k];
+                I.__diffData[fromatObjPath([...keys])] = data[k];
               };
               !index && this._assignObj(this.__data, keys, data[k])
             }
           }
         }
-        Object.assign(I.__diffData, this._diff(I.data, newData))
+        Object.assign(I.__diffData, diff(I.data, newData))
         if (need) {
           this._update(I)
         }
@@ -320,7 +261,6 @@ export class WxStore {
     })
   }
 }
-
 /**
  * 挂载状态管理
  * @param {*} store 状态管理器
@@ -334,7 +274,65 @@ function attachStore(store, target) {
   }, target);
   Object.assign(target, store.mapActions(target.mapActions), store.mapMutations(target.mapMutations))
 }
-
+/**
+ * 格式化对象路径
+ * @param {*} keys 路径数组
+ */
+function fromatObjPath(keys) {
+  let key = `${keys[0]}`;
+  let arr = keys.slice(1);
+  if (arr.length) {
+    arr.forEach((k) => {
+      if (isNaN(k)) {
+        key += `.${k}`
+      } else {
+        key += `[${k}]`
+      }
+    })
+  }
+  return key
+}
+/**
+ * diff 算法
+ * @param {*} oobj 原数据
+ * @param {*} obj 修改数据
+ * @param {*} okeys 修改对象的查找key数组
+ * @param {*} diffObj 生成的计算后的setData数据
+ */
+export function diff(oobj = {}, obj = {}, okeys = [], diffObj = {}) {
+  for (let k in obj) {
+    const keys = okeys.concat([k]);
+    if (obj[k] instanceof Object && oobj[k] instanceof Object) {
+      diff(oobj[k], obj[k], keys, diffObj)
+    } else if (obj[k] !== oobj[k]) {
+      diffObj[fromatObjPath(keys)] = obj[k]
+    }
+  }
+  return diffObj
+}
+/**
+ * 克隆对象
+ * @param {*} Obj 克隆对象
+ */
+export function clone(Obj) {
+  let buf;
+  if (Obj instanceof Array) {
+    buf = []; // 创建一个空的数组
+    let i = Obj.length;
+    while (i--) {
+      buf[i] = clone(Obj[i]);
+    }
+    return buf;
+  } else if (Obj instanceof Object) {
+    buf = {}; // 创建一个空对象
+    for (let k in Obj) { // 为这个对象添加新的属性
+      buf[k] = clone(Obj[k]);
+    }
+    return buf;
+  } else {
+    return Obj;
+  }
+}
 /**
  * 组件中获取当前page
  * @param {*} I 页面、组件实例
@@ -348,7 +346,6 @@ export function getCurrentPage(I) {
     }
   }
 }
-
 /**
  * 页面初始化状态
  * @param {*} p 页面初始化参数
@@ -370,7 +367,6 @@ export function StorePage(p) {
   }
   Page(p)
 }
-
 /**
  * 组件初始化状态
  * @param {*} p 组件初始化参数

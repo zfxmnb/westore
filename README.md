@@ -2,11 +2,11 @@
 ## 一个微信小程序状态管理工具
 wxstore为类vuex的轻量级微信小程序状态管理工具
 ### 特点
-* 类vuex，跨端开发切换方便
+* 类vuex，使用mutations、actions概念，跨端开发切换方便
 * 合并多次同步的setData操作
 * 使用时不需要关心异步回调问题
 * 支持组件页面级的状态管理，也可绑定多个全局的状态管理器
-* 内置diff，避免出现一次设置过多数据造成数据超限错误、以及不必要的状态更新
+* 内置diff，避免出现一次设置过多数据造成数据超限错误、以及不必要的状态更新，diff可独立于状态管理器使用
 * 对于复杂对象数据有较大的性能提升
 * 支持改变数组中的某一项或对象的某个属性
 ## 注意
@@ -69,10 +69,15 @@ export default {
 // index.js
 import store from './store.js'
 import {
-  StorePage
+  StorePage,
+  diff,
+  clone
 } from './../wxstore.js'
 import globalStore from './../globalStore.js'
 StorePage({
+  data: {
+    list: [{'index': 1}]
+  },
   store,
   bindStores: [
     [globalStore, ['year']]
@@ -91,6 +96,13 @@ StorePage({
     globalStore.dispatch('addYear', {})
     this._store.commit('updateFriends')
     this._store.dispatch('updateUserInfo', e)
+    const newData = ({ list: clone(this.data.list).concat([{ 'index': 1 }])})
+    newData.list = newData.list.map((item) => {
+      return {index: '1'}
+    })
+    const diffData = diff(this.data, newData)
+    console.log(diffData)
+    this.setData(diffData)
   },
   changeName(e) {
     this._store.commit('setName', e.currentTarget.dataset.name)
