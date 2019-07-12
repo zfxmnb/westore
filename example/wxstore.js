@@ -8,6 +8,10 @@ export class WxStore {
     this.__mutations = p.mutations || {}; // 改变状态方法
     this.__actions = p.actions || {}; // 行为
     this.__dataMap = {}; // 数据与实例数据名称映射关系
+    this.__dataMirror = { // 镜像数据避免直接对__data修改
+      timer: null,
+      data: null
+    }
   }
   /**
    * 克隆对象
@@ -74,7 +78,7 @@ export class WxStore {
    * @param {*} okeys 修改对象的查找key数组
    * @param {*} diffObj 生成的计算后的setData数据
    */
-  _diff(oobj = {}, obj, okeys = [], diffObj = {}) {
+  _diff(oobj = {}, obj = {}, okeys = [], diffObj = {}) {
     for (let k in obj) {
       const keys = okeys.concat([k]);
       if (obj[k] instanceof Object && oobj[k] instanceof Object) {
@@ -183,6 +187,16 @@ export class WxStore {
     this._removeDataMap(I)
   }
   /**
+   * 镜像数据
+   */
+  _dataMirror() {
+    this.__dataMirror.timer && clearTimeout(this.__dataMirror.timer);
+    this.__dataMirror.timer = setTimeout(() => {
+      this.__dataMirror.data = this.__dataMirror.timer = null;
+    })
+    return this.__dataMirror.data || this._clone(this.__data)
+  }
+  /**
    * 绑定其他store
    * @param { Store, bindData } list 绑定的Store
    * @param {*} I 页面、组件实例
@@ -247,7 +261,7 @@ export class WxStore {
   commit(type, payload) {
     if (typeof type === 'string' && (typeof this.__mutations[type] === 'function')) {
       this.__mutations[type]({
-        data: this._clone(this.__data),
+        data: this._dataMirror(),
         payload,
         setData: this.setData.bind(this)
       })
@@ -263,7 +277,7 @@ export class WxStore {
   dispatch(type, payload) {
     if (typeof type === 'string' && (typeof this.__actions[type] === 'function')) {
       this.__actions[type]({
-        data: this._clone(this.__data),
+        data: this._dataMirror(),
         payload,
         commit: this.commit.bind(this)
       })

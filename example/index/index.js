@@ -1,21 +1,26 @@
-const app = getApp()
 import store from './store.js'
-import { StorePage } from './../wxstore.js'
+import {
+  StorePage
+} from './../wxstore.js'
 import globalStore from './../globalStore.js'
 StorePage({
   store,
-  bindStores: [[globalStore, ['year']]],
-  bindData: { 'Name': 'name', 'Age': 'age', 'height': 'height', 'friends':'friends'},
-  mapMutations: ['addFriend','resetFriendName'],
-  onLoad() {
-    console.log(this.parent)
+  bindStores: [
+    [globalStore, ['year']]
+  ],
+  bindData: {
+    'Name': 'name',
+    'Age': 'age',
+    'height': 'height',
+    'friends': 'friends'
   },
+  mapMutations: ['addFriend', 'resetFriendName'],
   to() {
     wx.navigateTo({
       url: '/index/index',
     })
   },
-  updateInfo(e){
+  updateInfo(e) {
     globalStore.commit('addYear', {})
     this._store.commit('updateFriends')
     this._store.dispatch('updateUserInfo', e)

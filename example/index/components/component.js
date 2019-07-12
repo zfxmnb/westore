@@ -11,6 +11,6 @@ StoreComponent({
   methods: {
     changeName(e) {
       this._store.commit('setName', e.currentTarget.dataset.name)
-    },
+    }
   }
 })

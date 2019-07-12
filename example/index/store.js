@@ -12,20 +12,20 @@ export default {
       }
     },
     mutations: {
-      setName({ data, setData, payload }){
+      setName({ data, setData, payload }) {
         setData({ name: payload})
       },
-      setAge({ data, setData, payload }){
+      setAge({ data, setData, payload }) {
         setData({ age: data.age + 1 })
       },
       setHeight({ data, setData, payload }) {
         let height = data.height >= 180 ? data.height : data.height + 6
         setData({ height })
       },
-      addFriend({ data, setData, payload }){
+      addFriend({ data, setData, payload }) {
         setData({ friends: (data.friends || []).concat({ name: '小白兔', age: data.age }) })
       },
-      updateFriends({ data, setData, payload }){
+      updateFriends({ data, setData, payload }) {
         if (data.friends){
           data.friends = data.friends.map((item) => {
             item.age++;
@@ -38,7 +38,7 @@ export default {
         const index = payload.currentTarget.dataset.index
         if (data.friends[index]) {
           let newData = {};
-          let key = `friends[${index}].name[0]`
+          let key = `friends[${index}].name`
           newData[key] = '大白兔'
           setData(newData)
         }

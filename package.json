@@ -1,9 +1,8 @@
 {
-  "name": "wxstore",
+  "name": "@fanx/wxstore",
   "version": "0.1.0",
   "description": "wechat miniprogram store manager",
   "main": "index.js",
-  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zfxmnb/westore.git"

@@ -5,12 +5,13 @@ wxstore为类vuex的轻量级微信小程序状态管理工具
 * 类vuex，跨端开发切换方便
 * 合并多次同步的setData操作
 * 使用时不需要关心异步回调问题
-* 支持组件页面级的集成状态管理，也可以做全局的状态管理
-* 内置diff，避免出现一次设置过多数据造成数据超限错误
-* 合并setData，clone，diff等操作可能增加从setData到渲染的时间
+* 支持组件页面级的状态管理，也可绑定多个全局的状态管理器
+* 内置diff，避免出现一次设置过多数据造成数据超限错误、以及不必要的状态更新
+* 对于复杂对象数据有较大的性能提升
 * 支持改变数组中的某一项或对象的某个属性
 ## 注意
 * 使用时改变数组中的某一项或对象的某个属性与小程序自带setData略有差异,x.y 为非数组对象时 x.y[0] = 'xxx' x.y依然为对象；x.y 为数组时 x.y.z = 'xxx' x.y会自动转成非数组对象
+* 正式版前可能任然存在问题，请谨慎使用
 ## 使用
 ```js
 import { WxStore, StorePage, StoreComponent } from "wxstore";
@@ -67,22 +68,28 @@ export default {
 }
 // index.js
 import store from './store.js'
-import { StorePage } from './../wxstore.js'
+import {
+  StorePage
+} from './../wxstore.js'
 import globalStore from './../globalStore.js'
 StorePage({
   store,
-  bindStores: [[globalStore, ['year']]],
-  bindData: { 'Name': 'name', 'Age': 'age', 'height': 'height', 'friends':'friends'},
-  mapMutations: ['addFriend','resetFriendName'],
-  onLoad(){
-    console.log(this,globalStore)
+  bindStores: [
+    [globalStore, ['year']]
+  ],
+  bindData: {
+    'Name': 'name',
+    'Age': 'age',
+    'height': 'height',
+    'friends': 'friends'
   },
+  mapMutations: ['addFriend', 'resetFriendName'],
   to() {
     wx.navigateTo({
       url: '/index/index',
     })
   },
-  updateInfo(e){
+  updateInfo(e) {
     globalStore.commit('addYear', {})
     this._store.commit('updateFriends')
     this._store.dispatch('updateUserInfo', e)
@@ -103,13 +110,15 @@ StoreComponent({
   bindData: ['name', 'age', 'height'],
   data: {},
   mapActions: ['updateUserInfo'],
+  ready(){
+    console.log(this)
+  },
   methods: {
     changeName(e) {
       this._store.commit('setName', e.currentTarget.dataset.name)
-    },
+    }
   }
 })
-
 ```
 ### 全局
 ```js
