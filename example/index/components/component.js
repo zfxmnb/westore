@@ -5,9 +5,6 @@ StoreComponent({
   bindData: ['name', 'age', 'height'],
   data: {},
   mapActions: ['updateUserInfo'],
-  ready(){
-    console.log(this)
-  },
   methods: {
     changeName(e) {
       this._store.commit('setName', e.currentTarget.dataset.name)

@@ -3,10 +3,14 @@ export default new WxStore({
   data: {
     year: 2019
   },
-  actions: {},
   mutations: {
-    addYear({ data, setData, payload = {} }) {
-      setData({ year: data.year + 1 })
+    setYear({ data, setData, payload}) {
+      setData({ year: payload})
+    }
+  },
+  actions: {
+    addYear({ data, commit}){
+      commit('setYear', data.year + 1)
     }
   }
 })

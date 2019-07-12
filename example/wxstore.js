@@ -96,15 +96,15 @@ export class WxStore {
    */
   _map(s, fn) {
     let obj = null;
-    if (typeof s === 'object') {
+    if (s instanceof Object) {
       obj = {};
-      for (let k in s) {
-        const dk = isNaN(k) ? k : s[k];
-        if (isNaN(dk)) {
-          const val = fn && fn(k, dk);
-          if (val !== undefined) {
-            obj[dk] = val
-          }
+      for (let key in s) {
+        if (typeof s[key] === 'string' && isNaN(s[key])) {
+          const dkey = typeof key === 'string' && isNaN(key) ? key : s[key];
+          const val = fn && fn(s[key], dkey);
+          val !== undefined && (obj[dkey] = val)
+        } else if (s[key] instanceof Object) {
+          Object.assign(obj, this._map(s[key], fn))
         }
       }
     }
@@ -117,9 +117,13 @@ export class WxStore {
    */
   _mapData(p, cb) {
     let map = {}
-    const data = this._map(p, (k, dk) => {
-      map[p[k]] = dk;
-      return this.__data[p[k]]
+    const data = this._map(p, (sKey, dKey) => {
+      map[sKey] = dKey;
+      if (this.__data[sKey] === undefined) {
+        console.error(new Error(`data[${sKey} is undefined]`), this);
+        return
+      }
+      return this.__data[sKey]
     })
     cb && cb(data, map);
     return data
@@ -174,7 +178,7 @@ export class WxStore {
       p.bindData = p.bindData();
       this._init(p, I)
     } else {
-      console.error(new Error(`bindData is not object`))
+      console.error(new Error(`bindData is not object`), this)
     }
   }
   /**
@@ -198,22 +202,22 @@ export class WxStore {
   }
   /**
    * 绑定其他store
-   * @param { Store, bindData } list 绑定的Store
+   * @param { [store, bindData] } list 绑定的Store
    * @param {*} I 页面、组件实例
    */
   bindStores(list, I) {
     if (list instanceof Array) {
-      if (list[0]) {
+      if (list[0] instanceof Object) {
         const item = list.shift();
-        if (item && item[0] && item[0]._init) {
-          item[0]._init({
-            bindData: item[1]
-          }, I)
-        }
+        const store = item[0] || item.store;
+        const bindData = item[1] || item.bindData;
+        store && store._init && store._init({
+          bindData
+        }, I)
         this.bindStores(list, I)
       }
     } else {
-      console.error(new Error(`bindStores is not Array`))
+      console.error(new Error(`bindStores is not Array`), this)
     }
   }
   /**
@@ -250,7 +254,7 @@ export class WxStore {
         }
       });
     } else {
-      console.error(new Error(`setData params should object`))
+      console.error(new Error(`setData params should object`), this)
     }
   }
   /**
@@ -266,7 +270,7 @@ export class WxStore {
         setData: this.setData.bind(this)
       })
     } else {
-      console.error(new Error(`mutations["${type}"] is undefined`))
+      console.error(new Error(`mutations["${type}"] is undefined`), this)
     }
   }
   /**
@@ -282,7 +286,7 @@ export class WxStore {
         commit: this.commit.bind(this)
       })
     } else {
-      console.error(new Error(`actions["${type}"] is undefined`))
+      console.error(new Error(`actions["${type}"] is undefined`), this)
     }
   }
   /**
@@ -290,9 +294,13 @@ export class WxStore {
    * @param {*} p Object || Array
    */
   mapMutations(p) {
-    return this._map(p, (k) => {
+    return this._map(p, (sKey) => {
+      if (typeof this.__mutations[sKey] !== 'function') {
+        console.error(new Error(`mutations[${sKey}] is undefined`), this);
+        return
+      }
       return (e) => {
-        this.commit(p[k], e)
+        this.commit(sKey, e)
       }
     })
   }
@@ -301,12 +309,30 @@ export class WxStore {
    * @param {*} p Object || Array
    */
   mapActions(p) {
-    return this._map(p, (k) => {
+    return this._map(p, (sKey) => {
+      if (typeof this.__actions[sKey] !== 'function') {
+        console.error(new Error(`actions[${sKey}] is undefined`), this);
+        return
+      }
       return (e) => {
-        this.dispatch(p[k], e)
+        this.dispatch(sKey, e)
       }
     })
   }
+}
+
+/**
+ * 挂载状态管理
+ * @param {*} store 状态管理器
+ * @param {*} target 挂载目标组件页面
+ */
+function attachStore(store, target) {
+  target._store = store;
+  store.bindStores([...(target.bindStores || [])], target);
+  store._init({
+    bindData: target.bindData || {}
+  }, target);
+  Object.assign(target, store.mapActions(target.mapActions), store.mapMutations(target.mapMutations))
 }
 
 /**
@@ -331,10 +357,11 @@ export function StorePage(p) {
   const onLoad = p.onLoad,
     onUnload = p.onUnload;
   p.onLoad = function () {
-    this._store = new WxStore(p.store);
-    this._store.bindStores([...p.bindStores], this);
-    this._store._init(p, this);
-    Object.assign(this, this._store.mapActions(p.mapActions), this._store.mapMutations(p.mapMutations));
+    attachStore(new WxStore(p.store), this);
+    this.queueComponents.forEach((component) => {
+      attachStore(this._store, component)
+    });
+    delete this.queueComponents
     onLoad && onLoad.apply(this, arguments)
   }
   p.onUnload = function () {
@@ -349,18 +376,29 @@ export function StorePage(p) {
  * @param {*} p 组件初始化参数
  */
 export function StoreComponent(p) {
-  const ready = p.ready,
+  const attached = p.attached,
     detached = p.detached;
-  p.ready = function () {
+  p.attached = function () {
+    const {
+      bindData,
+      bindStores,
+      mapActions,
+      mapMutations
+    } = p;
+    Object.assign(this, {
+      bindData,
+      bindStores,
+      mapActions,
+      mapMutations
+    });
     const currentPage = getCurrentPage(this);
     if (currentPage._store) {
-      this._store = currentPage._store;
-      this._store.bindStores([...p.bindStores], this);
-      this._store._init(p, this);
-      Object.assign(this, this._store.mapActions(p.mapActions), this._store.mapMutations(p.mapMutations));
-      ready && ready.apply(this, arguments)
+      attachStore(currentPage._store, this);
+      attached && attached.apply(this, arguments)
     } else {
-      ready && ready.apply(this, arguments)
+      currentPage.queueComponents = currentPage.queueComponents || [];
+      currentPage.queueComponents.push(this);
+      attached && attached.apply(this, arguments)
     }
   }
   p.detached = function () {

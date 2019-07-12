@@ -8,12 +8,10 @@ StorePage({
   bindStores: [
     [globalStore, ['year']]
   ],
-  bindData: {
+  bindData: [{
     'Name': 'name',
     'Age': 'age',
-    'height': 'height',
-    'friends': 'friends'
-  },
+  }, 'friends', 'height'],
   mapMutations: ['addFriend', 'resetFriendName'],
   to() {
     wx.navigateTo({
@@ -21,12 +19,12 @@ StorePage({
     })
   },
   updateInfo(e) {
-    globalStore.commit('addYear', {})
+    globalStore.dispatch('addYear', {})
     this._store.commit('updateFriends')
     this._store.dispatch('updateUserInfo', e)
   },
   changeName(e) {
     this._store.commit('setName', e.currentTarget.dataset.name)
   },
-  ...globalStore.mapMutations(['setHeight'])
+  ...globalStore.mapActions(['addYear', { 'nextYear':'addYear'}])
 })
