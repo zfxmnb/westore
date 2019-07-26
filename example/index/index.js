@@ -1,9 +1,9 @@
 import store from './store.js'
 import {
   StorePage,
-  diff,
   clone
 } from './../wxstore.js'
+import diff from '../utils/diff'
 import globalStore from './../globalStore.js'
 StorePage({
   data: {
@@ -27,12 +27,15 @@ StorePage({
     globalStore.dispatch('addYear', {})
     this._store.commit('updateFriends')
     this._store.dispatch('updateUserInfo', e)
-    const newData = ({ list: clone(this.data.list).concat([{ 'index': 1 }])})
+    
+    let newData = clone(this.data)
+    newData.list.concat([{ 'index': 1 }])
     newData.list = newData.list.map((item) => {
-      return {index: '1'}
+      return {index: '2'}
     })
-    const diffData = diff(this.data, newData)
-    console.log(diffData)
+    newData.test = 10000
+    const diffData = diff(newData, this.data)
+    console.log(newData, this.data, diffData)
     this.setData(diffData)
   },
   changeName(e) {

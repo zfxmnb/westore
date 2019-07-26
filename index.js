@@ -1,6 +1,7 @@
 /**
  * 微信小程序状态管理
  */
+import diff from './utils/diff'
 export class WxStore {
   constructor(p = {}) {
     this.__instance = []; // 挂载store实例的页面、组件
@@ -8,10 +9,7 @@ export class WxStore {
     this.__mutations = p.mutations || {}; // 改变状态方法
     this.__actions = p.actions || {}; // 行为
     this.__dataMap = {}; // 数据与实例数据名称映射关系
-    this.__dataMirror = { // 镜像数据避免直接对__data修改
-      timer: null,
-      data: null
-    }
+    this.__dataMirror = null // 镜像数据避免直接对__data修改
   }
   /**
    * 根据路径写入数据
@@ -21,9 +19,9 @@ export class WxStore {
    */
   _assignObj(oData, keys, val) {
     for (var i = 0; i < keys.length - 1; i++) {
-      if (oData[keys[i]] instanceof Array && isNaN(keys[i + 1])) {
+      if (checkType(oData[keys[i]], ['Array']) && isNaN(keys[i + 1])) {
         oData[keys[i]] = {}
-      } else if (!(oData[keys[i]] instanceof Object)) {
+      } else if (!checkType(oData[keys[i]], ['Array', 'Object'])) {
         oData[keys[i]] = isNaN(keys[i + 1]) ? {} : []
       }
       oData = oData[keys[i]]
@@ -37,14 +35,14 @@ export class WxStore {
    */
   _map(s, fn) {
     let obj = null;
-    if (s instanceof Object) {
+    if (checkType(s, ['Array', 'Object'])) {
       obj = {};
       for (let key in s) {
-        if (typeof s[key] === 'string' && isNaN(s[key])) {
-          const dkey = typeof key === 'string' && isNaN(key) ? key : s[key];
+        if (checkType(s[key], ['String']) && isNaN(s[key])) {
+          const dkey = checkType(key, ['String']) && isNaN(key) ? key : s[key];
           const val = fn && fn(s[key], dkey);
           val !== undefined && (obj[dkey] = val)
-        } else if (s[key] instanceof Object) {
+        } else if (checkType(s[key], ['Array', 'Object'])) {
           Object.assign(obj, this._map(s[key], fn))
         }
       }
@@ -91,12 +89,11 @@ export class WxStore {
    * @param {*} I 页面、组件实例
    */
   _update(I) {
-    I.__timer && clearTimeout(I.__timer);
-    I.__timer = setTimeout(() => {
+    Promise.resolve().then(() => {
       I.setData(I.__diffData);
       I.__diffData = {};
       I.__timer = null
-    });
+    })
   }
   /**
    * 初始化转态数据
@@ -106,7 +103,7 @@ export class WxStore {
   _init(p, I) {
     I.__diffData = I.__diffData || {};
     let dataMap = this._getDataMap(I);
-    if (typeof p.bindData === 'object') {
+    if (checkType(p.bindData, ['Array', 'Object'])) {
       this._mapData(p.bindData, (data, map) => {
         Object.assign(dataMap, map);
         !this.__instance.includes(I) && this.__instance.push(I);
@@ -115,7 +112,7 @@ export class WxStore {
           this._update(I)
         }
       })
-    } else if (typeof p.bindData === 'function') {
+    } else if (checkType(p.bindData, ['Function'])) {
       p.bindData = p.bindData();
       this._init(p, I)
     } else {
@@ -135,11 +132,11 @@ export class WxStore {
    * 镜像数据
    */
   _dataMirror() {
-    this.__dataMirror.timer && clearTimeout(this.__dataMirror.timer);
-    this.__dataMirror.timer = setTimeout(() => {
-      this.__dataMirror.data = this.__dataMirror.timer = null;
+    this.__dataMirror = this.__dataMirror || clone(this.__data)
+    Promise.resolve().then(() => {
+      this.__dataMirror = null
     })
-    return this.__dataMirror.data || clone(this.__data)
+    return this.__dataMirror
   }
   /**
    * 绑定其他store
@@ -147,8 +144,8 @@ export class WxStore {
    * @param {*} I 页面、组件实例
    */
   bindStores(list, I) {
-    if (list instanceof Array) {
-      if (list[0] instanceof Object) {
+    if (checkType(list, ['Array'])) {
+      if (checkType(list[0], ['Array', 'Object'])) {
         const item = list.shift();
         const store = item[0] || item.store;
         const bindData = item[1] || item.bindData;
@@ -166,31 +163,33 @@ export class WxStore {
    * @param {*} data 设置数据
    */
   setData(data) {
-    if (Object.prototype.toString.call(data) === '[object Object]') {
+    if (checkType(data, ['Object'])) {
       this.__instance.forEach((I, index) => {
-        let need = false;
-        let newData = {};
+        let needUpdate = false;
+        let pre = {};
+        let current = {};
         let dataMap = this._getDataMap(I);
         for (let k in data) {
           if (this.__data[k] !== undefined) {
             if (dataMap[k] !== undefined) {
-              need = true;
-              newData[dataMap[k]] = data[k];
-            };
+              needUpdate = true;
+              pre[dataMap[k]] = I.data[dataMap[k]];
+              current[dataMap[k]] = data[k]
+            }
             !index && (this.__data[k] = data[k])
           } else {
             let keys = k.match(/[^\[|\]|\.]+/g);
             if (this.__data[keys[0]] !== undefined && keys.length > 1) {
               if (dataMap[keys[0]] !== undefined) {
-                need = true;
-                I.__diffData[fromatObjPath([...keys])] = data[k];
-              };
+                needUpdate = true;
+                I.__diffData[k] = data[k]
+              }
               !index && this._assignObj(this.__data, keys, data[k])
             }
           }
         }
-        Object.assign(I.__diffData, diff(I.data, newData))
-        if (need) {
+        Object.assign(I.__diffData, diff(current, pre))
+        if (needUpdate) {
           this._update(I)
         }
       });
@@ -204,7 +203,7 @@ export class WxStore {
    * @param {*} payload 传输数据
    */
   commit(type, payload) {
-    if (typeof type === 'string' && (typeof this.__mutations[type] === 'function')) {
+    if (checkType(type, ['String']) && checkType(this.__mutations[type], ['Function'])) {
       this.__mutations[type]({
         data: this._dataMirror(),
         payload,
@@ -220,7 +219,7 @@ export class WxStore {
    * @param {*} payload 传输数据
    */
   dispatch(type, payload) {
-    if (typeof type === 'string' && (typeof this.__actions[type] === 'function')) {
+    if (checkType(type, ['String']) && checkType(this.__actions[type], ['Function'])) {
       this.__actions[type]({
         data: this._dataMirror(),
         payload,
@@ -236,7 +235,7 @@ export class WxStore {
    */
   mapMutations(p) {
     return this._map(p, (sKey) => {
-      if (typeof this.__mutations[sKey] !== 'function') {
+      if (!checkType(this.__mutations[sKey], ['Function'])) {
         console.error(new Error(`mutations[${sKey}] is undefined`), this);
         return
       }
@@ -251,7 +250,7 @@ export class WxStore {
    */
   mapActions(p) {
     return this._map(p, (sKey) => {
-      if (typeof this.__actions[sKey] !== 'function') {
+      if (!checkType(this.__actions[sKey], ['Function'])) {
         console.error(new Error(`actions[${sKey}] is undefined`), this);
         return
       }
@@ -275,40 +274,22 @@ function attachStore(store, target) {
   Object.assign(target, store.mapActions(target.mapActions), store.mapMutations(target.mapMutations))
 }
 /**
- * 格式化对象路径
- * @param {*} keys 路径数组
+ * 校验数据类型
+ * @param {*} val 数据
+ * @param {'String','Number','Boolean','Null','Undefined','Array','Object','Function'} types 匹配类型数组
  */
-function fromatObjPath(keys) {
-  let key = `${keys[0]}`;
-  let arr = keys.slice(1);
-  if (arr.length) {
-    arr.forEach((k) => {
-      if (isNaN(k)) {
-        key += `.${k}`
-      } else {
-        key += `[${k}]`
-      }
-    })
-  }
-  return key
-}
-/**
- * diff 算法
- * @param {*} oobj 原数据
- * @param {*} obj 修改数据
- * @param {*} okeys 修改对象的查找key数组
- * @param {*} diffObj 生成的计算后的setData数据
- */
-export function diff(oobj = {}, obj = {}, okeys = [], diffObj = {}) {
-  for (let k in obj) {
-    const keys = okeys.concat([k]);
-    if (obj[k] instanceof Object && oobj[k] instanceof Object) {
-      diff(oobj[k], obj[k], keys, diffObj)
-    } else if (obj[k] !== oobj[k]) {
-      diffObj[fromatObjPath(keys)] = obj[k]
+function checkType(val, types = []) {
+  let result = false;
+  let t = Object.prototype.toString.call(val);
+  let i = 0;
+  while (i < types.length) {
+    if (t === `[object ${types[i]}]`) {
+      result = true;
+      break
     }
+    i++
   }
-  return diffObj
+  return result
 }
 /**
  * 克隆对象
@@ -316,21 +297,21 @@ export function diff(oobj = {}, obj = {}, okeys = [], diffObj = {}) {
  */
 export function clone(Obj) {
   let buf;
-  if (Obj instanceof Array) {
+  if (checkType(Obj, ['Array'])) {
     buf = []; // 创建一个空的数组
     let i = Obj.length;
     while (i--) {
       buf[i] = clone(Obj[i]);
     }
     return buf;
-  } else if (Obj instanceof Object) {
+  } else if (checkType(Obj, ['Array', 'Object'])) {
     buf = {}; // 创建一个空对象
     for (let k in Obj) { // 为这个对象添加新的属性
       buf[k] = clone(Obj[k]);
     }
-    return buf;
+    return buf
   } else {
-    return Obj;
+    return Obj
   }
 }
 /**
@@ -399,7 +380,7 @@ export function StoreComponent(p) {
   }
   p.detached = function () {
     this._store && this._store._detach(this);
-    detached && detached.apply(this, arguments);
+    detached && detached.apply(this, arguments)
   }
   Component(p)
 }

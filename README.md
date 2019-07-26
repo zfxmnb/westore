@@ -11,7 +11,6 @@ wxstore为类vuex的轻量级微信小程序状态管理工具
 * 支持改变数组中的某一项或对象的某个属性
 ## 注意
 * 使用时改变数组中的某一项或对象的某个属性与小程序自带setData略有差异,x.y 为非数组对象时 x.y[0] = 'xxx' x.y依然为对象；x.y 为数组时 x.y.z = 'xxx' x.y会自动转成非数组对象
-* 正式版前可能任然存在问题，请谨慎使用
 ## 使用
 ```js
 import { WxStore, StorePage, StoreComponent } from "wxstore";
@@ -70,9 +69,9 @@ export default {
 import store from './store.js'
 import {
   StorePage,
-  diff,
   clone
 } from './../wxstore.js'
+import diff from '../utils/diff'
 import globalStore from './../globalStore.js'
 StorePage({
   data: {
@@ -96,12 +95,14 @@ StorePage({
     globalStore.dispatch('addYear', {})
     this._store.commit('updateFriends')
     this._store.dispatch('updateUserInfo', e)
-    const newData = ({ list: clone(this.data.list).concat([{ 'index': 1 }])})
+    let newData = clone(this.data)
+    newData.list.concat([{ 'index': 1 }])
     newData.list = newData.list.map((item) => {
-      return {index: '1'}
+      return {index: '2'}
     })
-    const diffData = diff(this.data, newData)
-    console.log(diffData)
+    newData.test = 10000
+    const diffData = diff(newData, this.data)
+    console.log(newData, this.data, diffData)
     this.setData(diffData)
   },
   changeName(e) {
